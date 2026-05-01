@@ -1,0 +1,310 @@
+/* Banco ATLANTICO inspired visual direction: deep blue, cyan highlights, and warm gold accents */
+.root {
+  -fx-font-family: "Montserrat", "Poppins", "Noto Sans";
+}
+
+.form-scroll {
+  -fx-background-color:
+    radial-gradient(
+      center 15% 10%,
+      radius 45%,
+      rgba(12, 182, 217, 0.22),
+      transparent 65%
+    ),
+    linear-gradient(
+      to bottom,
+      #051a3b 0%,
+      #082a56 36%,
+      #edf3fb 36%,
+      #edf3fb 100%
+    );
+}
+
+.form-scroll > .viewport {
+  -fx-background-color: transparent;
+}
+
+.page {
+  -fx-padding: 30 36 42 36;
+  -fx-spacing: 24;
+}
+
+.hero {
+  -fx-background-color: linear-gradient(
+    to right,
+    #031d42 0%,
+    #0a3f7a 58%,
+    #18b7d7 100%
+  );
+  -fx-background-radius: 24;
+  -fx-effect: dropshadow(gaussian, rgba(3, 20, 46, 0.34), 34, 0.28, 0, 12);
+}
+
+.hero-bank {
+  -fx-text-fill: #ffffff;
+  -fx-font-size: 32px;
+  -fx-font-weight: 800;
+  -fx-letter-spacing: 0.9px;
+}
+
+.hero-desc {
+  -fx-text-fill: rgba(255, 255, 255, 0.9);
+  -fx-font-size: 15px;
+  -fx-font-weight: 500;
+}
+
+.form-card {
+  -fx-background-color: linear-gradient(to bottom, #ffffff 0%, #f7fbff 100%);
+  -fx-background-radius: 24;
+  -fx-padding: 28;
+  -fx-effect: dropshadow(gaussian, rgba(3, 21, 46, 0.14), 26, 0.18, 0, 8);
+}
+
+.eyebrow-label {
+  -fx-text-fill: #0c6c97;
+  -fx-font-size: 12px;
+  -fx-font-weight: 800;
+  -fx-background-color: #dff6fc;
+  -fx-background-radius: 999;
+  -fx-padding: 6 12 6 12;
+}
+
+.form-title {
+  -fx-text-fill: #062650;
+  -fx-font-size: 28px;
+  -fx-font-weight: 800;
+}
+
+.form-subtitle {
+  -fx-text-fill: #296497;
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+}
+
+.lead-copy {
+  -fx-text-fill: #446380;
+  -fx-font-size: 13px;
+  -fx-line-spacing: 2px;
+}
+
+.info-strip {
+  -fx-padding: 6 0 2 0;
+}
+
+.info-card {
+  -fx-background-color: linear-gradient(
+    to bottom right,
+    #082f61 0%,
+    #0d477e 100%
+  );
+  -fx-background-radius: 18;
+  -fx-padding: 16;
+  -fx-effect: dropshadow(gaussian, rgba(4, 29, 58, 0.16), 18, 0.18, 0, 5);
+}
+
+.info-title {
+  -fx-text-fill: #ffffff;
+  -fx-font-size: 14px;
+  -fx-font-weight: 800;
+}
+
+.info-copy {
+  -fx-text-fill: rgba(255, 255, 255, 0.84);
+  -fx-font-size: 12px;
+  -fx-font-weight: 500;
+}
+
+.section-panel {
+  -fx-background-color: #ffffff;
+  -fx-background-radius: 18;
+  -fx-border-color: #dbe8f6;
+  -fx-border-radius: 18;
+  -fx-padding: 18;
+}
+
+.section-title {
+  -fx-text-fill: #05366f;
+  -fx-font-size: 16px;
+  -fx-font-weight: 800;
+  -fx-padding: 0 0 8 0;
+}
+
+.sub-label,
+.field-label {
+  -fx-text-fill: #274668;
+}
+
+.choice-flow {
+  -fx-padding: 10;
+  -fx-background-color: #f4f8fd;
+  -fx-background-radius: 14;
+  -fx-border-color: #dce8f7;
+  -fx-border-radius: 14;
+}
+
+.radio-box {
+  -fx-background-color: #f4f8fd;
+  -fx-padding: 10 14 10 14;
+  -fx-background-radius: 12;
+  -fx-border-color: #dce8f7;
+  -fx-border-radius: 12;
+}
+
+.input-field,
+.combo-box,
+.date-picker,
+.input-area {
+  -fx-background-color: #f9fbff;
+  -fx-background-radius: 12;
+  -fx-border-color: #cfddf0;
+  -fx-border-radius: 12;
+  -fx-padding: 11 13 11 13;
+  -fx-text-fill: #0a2648;
+  -fx-font-size: 13px;
+}
+
+.input-field:focused,
+.combo-box:focused,
+.date-picker:focused,
+.input-area:focused {
+  -fx-border-color: #0cb6d9;
+  -fx-border-width: 1.5;
+  -fx-background-color: #ffffff;
+}
+
+.input-area {
+  -fx-wrap-text: true;
+}
+
+.check-box,
+.radio-button {
+  -fx-text-fill: #213b5b;
+  -fx-font-size: 12.5px;
+}
+
+.check-box .box,
+.radio-button .radio {
+  -fx-background-color: #ffffff;
+  -fx-border-color: #b9cde5;
+  -fx-border-radius: 4;
+  -fx-background-radius: 4;
+}
+
+.check-box:selected .mark,
+.radio-button:selected .dot {
+  -fx-background-color: #0cb6d9;
+}
+
+.terms-label {
+  -fx-text-fill: #315a82;
+  -fx-font-size: 12.5px;
+}
+
+.action-bar {
+  -fx-background-color: #f3f8fe;
+  -fx-background-radius: 16;
+  -fx-border-color: #d8e7f6;
+  -fx-border-radius: 16;
+  -fx-padding: 14;
+}
+
+.save-hint {
+  -fx-text-fill: #426485;
+  -fx-font-size: 12.5px;
+  -fx-font-weight: 600;
+}
+
+.primary-btn {
+  -fx-background-color: linear-gradient(to right, #04346b 0%, #0a4e92 100%);
+  -fx-text-fill: #ffffff;
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-background-radius: 10;
+  -fx-padding: 11 18 11 18;
+}
+
+.primary-btn:hover {
+  -fx-background-color: linear-gradient(to right, #022b5a 0%, #0a3f7b 100%);
+}
+
+.secondary-btn {
+  -fx-background-color: #f9f1df;
+  -fx-text-fill: #8a6517;
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-border-color: #e1c784;
+  -fx-border-radius: 10;
+  -fx-background-radius: 10;
+  -fx-padding: 11 18 11 18;
+}
+
+.secondary-btn:hover {
+  -fx-background-color: #f4e5c3;
+}
+
+.separator .line {
+  -fx-border-color: #e5edf7;
+}
+
+.footer-label {
+  -fx-text-fill: #d9e3f5;
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+}
+
+.thank-you-screen {
+  -fx-background-color:
+    radial-gradient(
+      center 50% 20%,
+      radius 55%,
+      rgba(24, 183, 215, 0.18),
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom,
+      #051a3b 0%,
+      #0a315f 55%,
+      #eef4fb 55%,
+      #eef4fb 100%
+    );
+}
+
+.thank-you-card {
+  -fx-alignment: center-left;
+  -fx-background-color: linear-gradient(to bottom, #ffffff 0%, #f6fbff 100%);
+  -fx-background-radius: 24;
+  -fx-padding: 32;
+  -fx-effect: dropshadow(gaussian, rgba(3, 20, 46, 0.18), 28, 0.22, 0, 10);
+}
+
+.thank-you-badge {
+  -fx-text-fill: #0c6c97;
+  -fx-font-size: 12px;
+  -fx-font-weight: 800;
+  -fx-background-color: #dff6fc;
+  -fx-background-radius: 999;
+  -fx-padding: 6 12 6 12;
+}
+
+.thank-you-title {
+  -fx-text-fill: #062650;
+  -fx-font-size: 30px;
+  -fx-font-weight: 800;
+}
+
+.thank-you-message {
+  -fx-text-fill: #3d5f81;
+  -fx-font-size: 14px;
+  -fx-line-spacing: 3px;
+}
+
+.thank-you-file {
+  -fx-text-fill: #0a4e92;
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-background-color: #eef7ff;
+  -fx-background-radius: 14;
+  -fx-border-color: #d4e6f8;
+  -fx-border-radius: 14;
+  -fx-padding: 12;
+}
