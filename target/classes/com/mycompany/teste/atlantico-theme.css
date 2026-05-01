@@ -308,3 +308,62 @@
   -fx-border-radius: 14;
   -fx-padding: 12;
 }
+
+.screen-action-row {
+  -fx-alignment: center-left;
+}
+
+.consult-screen {
+  -fx-background-color:
+    radial-gradient(
+      center 50% 20%,
+      radius 55%,
+      rgba(24, 183, 215, 0.18),
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom,
+      #051a3b 0%,
+      #0a315f 55%,
+      #eef4fb 55%,
+      #eef4fb 100%
+    );
+}
+
+.consult-card {
+  -fx-alignment: center-left;
+  -fx-background-color: linear-gradient(to bottom, #ffffff 0%, #f7fbff 100%);
+  -fx-background-radius: 24;
+  -fx-padding: 32;
+  -fx-effect: dropshadow(gaussian, rgba(3, 20, 46, 0.18), 28, 0.22, 0, 10);
+}
+
+.consult-title {
+  -fx-text-fill: #062650;
+  -fx-font-size: 28px;
+  -fx-font-weight: 800;
+}
+
+.consult-help {
+  -fx-text-fill: #3d5f81;
+  -fx-font-size: 14px;
+  -fx-line-spacing: 3px;
+}
+
+.consult-formula {
+  -fx-text-fill: #0a4e92;
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-background-color: #eef7ff;
+  -fx-background-radius: 14;
+  -fx-border-color: #d4e6f8;
+  -fx-border-radius: 14;
+  -fx-padding: 12;
+}
+
+.consult-output {
+  -fx-font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
+  -fx-font-size: 12.5px;
+  -fx-highlight-fill: #0a4e92;
+  -fx-highlight-text-fill: #ffffff;
+}

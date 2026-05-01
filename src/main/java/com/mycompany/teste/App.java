@@ -1,17 +1,19 @@
 package com.mycompany.teste;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.StringJoiner;
+import java.util.function.UnaryOperator;
+
+import com.mycompany.teste.model.Candidatura;
+import com.mycompany.teste.persistence.RandomAccessCandidaturaRepository;
+import com.mycompany.teste.persistence.SubmissionStorage;
+import com.mycompany.teste.service.CandidaturaService;
+import com.mycompany.teste.service.ValidationException;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
@@ -26,7 +28,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
@@ -37,19 +41,19 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 
 public class App extends Application {
 
-    private static final DateTimeFormatter FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final int RECORD_PAYLOAD_SIZE = 8192;
-    private static final int RECORD_SIZE = 1 + Integer.BYTES + RECORD_PAYLOAD_SIZE;
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
 
-    private record SubmissionStorage(Path filePath, long recordNumber) {}
+    private final CandidaturaService candidaturaService = new CandidaturaService(
+        new RandomAccessCandidaturaRepository(Paths.get(System.getProperty("user.dir"), "inscricoes"))
+    );
 
     @Override
     public void start(Stage stage) {
-        ScrollPane[] rootHolder = new ScrollPane[1];
+        final ScrollPane[] rootHolder = new ScrollPane[1];
 
         VBox page = new VBox(26);
         page.getStyleClass().add("page");
@@ -71,14 +75,14 @@ public class App extends Application {
         Label subtitle = new Label("Banco ATLANTICO | Recrutamento e Talento");
         subtitle.getStyleClass().add("form-subtitle");
 
-        Label lead = new Label("Preencha o formulario com os seus dados academicos e profissionais. Cada candidatura submetida fica guardada automaticamente em ficheiro.");
+        Label lead = new Label("Preencha o formulario com os seus dados academicos e profissionais. A validacao fica na camada de negocio, os registos sao guardados em RandomAccessFile e podem ser consultados diretamente pelo numero do registo.");
         lead.setWrapText(true);
         lead.getStyleClass().add("lead-copy");
 
         HBox highlights = new HBox(12,
             createInfoCard("Fluxo claro", "Secoes organizadas para preenchimento rapido."),
-            createInfoCard("Registo local", "Cada inscricao e guardada numa pasta de ficheiros."),
-            createInfoCard("Validacao basica", "Nome, email e consentimento sao obrigatorios.")
+            createInfoCard("Persistencia RAF", "Registos fixos em RandomAccessFile para acesso direto."),
+            createInfoCard("Negocio separado", "Validacao e submissao isoladas da camada JavaFX.")
         );
         highlights.getStyleClass().add("info-strip");
 
@@ -97,6 +101,14 @@ public class App extends Application {
         TextField provincia = createTextField("Provincia");
         TextField email = createTextField("E-mail");
         TextField telefone = createTextField("Contacto Telefonico");
+
+        applyLettersFilter(nomeCompleto, true);
+        applyLettersFilter(nacionalidade, false);
+        applyLettersFilter(residenciaPais, false);
+        applyLettersFilter(provincia, false);
+        applyDocumentFilter(biPassaporte);
+        applyEmailFilter(email);
+        applyPhoneFilter(telefone);
 
         GridPane dadosPessoais = createGrid();
         dadosPessoais.add(sectionHeader("1. DADOS PESSOAIS"), 0, 0, 4, 1);
@@ -145,6 +157,8 @@ public class App extends Application {
         TextField instituicao = createTextField("Instituicao");
         TextField paisFormacao = createTextField("Pais");
         DatePicker dataFimCurso = createDatePicker("Data de Fim de Curso");
+
+        applyLettersFilter(paisFormacao, false);
 
         GridPane habilitacoes = createGrid();
         habilitacoes.add(sectionHeader("2. HABILITACOES ACADEMICAS E AREA DE ESTUDO"), 0, 0, 4, 1);
@@ -212,6 +226,8 @@ public class App extends Application {
         TextField assinatura = createTextField("Assinatura do Candidato");
         DatePicker dataAssinatura = createDatePicker("Data");
 
+        applyLettersFilter(assinatura, true);
+
         GridPane termos = createGrid();
         termos.add(sectionHeader("5. TERMOS E CONSENTIMENTO"), 0, 0, 4, 1);
         termos.add(consentimento, 0, 1, 4, 1);
@@ -225,6 +241,17 @@ public class App extends Application {
         Button limpar = new Button("Limpar");
         limpar.getStyleClass().add("secondary-btn");
 
+        Button consultarRegisto = new Button("Consultar Registo");
+        consultarRegisto.getStyleClass().add("secondary-btn");
+        consultarRegisto.setOnAction(evt -> openConsultationScreen(
+            stage,
+            "",
+            () -> {
+                stage.getScene().setRoot(rootHolder[0]);
+                stage.setTitle("Banco ATLANTICO | Formulario de Candidatura");
+            }
+        ));
+
         bindOptionalField(areaOutra, areaOutraText);
         bindOptionalField(areaInteresseOutro, areaInteresseOutroText);
 
@@ -235,120 +262,63 @@ public class App extends Application {
         termos.getStyleClass().add("section-panel");
 
         enviar.setOnAction(evt -> {
-            String missingTextField = firstBlankField(
-                field("Nome Completo", nomeCompleto.getText()),
-                field("Nacionalidade", nacionalidade.getText()),
-                field("B.I. / Passaporte", biPassaporte.getText()),
-                field("Residencia (Pais)", residenciaPais.getText()),
-                field("Provincia", provincia.getText()),
-                field("E-mail", email.getText()),
-                field("Contacto Telefonico", telefone.getText()),
-                field("Curso / Curso Tecnico", curso.getText()),
-                field("Instituicao", instituicao.getText()),
-                field("Pais da Formacao", paisFormacao.getText()),
-                field("Objectivos Profissionais", objectivos.getText()),
-                field("Resumo Profissional / Curriculum Vitae", resumo.getText()),
-                field("Assinatura do Candidato", assinatura.getText())
-            );
-
-            if (missingTextField != null) {
-                showRequiredFieldAlert(missingTextField);
-                return;
-            }
-
-            if (dataNascimento.getValue() == null) {
-                showRequiredFieldAlert("Data de Nascimento");
-                return;
-            }
-
-            if (sexoGroup.getSelectedToggle() == null) {
-                showRequiredFieldAlert("Sexo");
-                return;
-            }
-
-            if (escolaridade.getValue() == null) {
-                showRequiredFieldAlert("Nivel de Escolaridade");
-                return;
-            }
-
-            if (!hasAnySelected(areaTech, areaEco, areaSaude, areaArtes, areaMkt, areaJuridica, areaTurismo, areaAgricultura, areaSecretariado, areaOutra)) {
-                showRequiredFieldAlert("Area de Estudo");
-                return;
-            }
-
-            if (areaOutra.isSelected() && areaOutraText.getText().isBlank()) {
-                showRequiredFieldAlert("Especifique a outra area");
-                return;
-            }
-
-            if (dataFimCurso.getValue() == null) {
-                showRequiredFieldAlert("Data de Fim de Curso");
-                return;
-            }
-
-            if (!hasAnySelected(areaBanca, areaLogistica, areaAdministrativa, areaDireito, areaContabilidade, areaTecnologias, areaMarketing, areaAuditoria, areaProjectos, areaRH, areaCompliance, areaInteresseOutro)) {
-                showRequiredFieldAlert("Areas de Interesse");
-                return;
-            }
-
-            if (areaInteresseOutro.isSelected() && areaInteresseOutroText.getText().isBlank()) {
-                showRequiredFieldAlert("Especifique outra area de interesse");
-                return;
-            }
-
-            if (dataAssinatura.getValue() == null) {
-                showRequiredFieldAlert("Data de Assinatura");
-                return;
-            }
-
-            if (!consentimento.isSelected()) {
-                showRequiredFieldAlert("Consentimento de Dados");
-                return;
-            }
-
-            Map<String, String> submission = new LinkedHashMap<>();
-            submission.put("Nome Completo", valueOrDash(nomeCompleto.getText()));
-            submission.put("Data de Nascimento", formatDate(dataNascimento.getValue()));
-            submission.put("Sexo", selectedToggleText(sexoGroup));
-            submission.put("Nacionalidade", valueOrDash(nacionalidade.getText()));
-            submission.put("B.I. / Passaporte", valueOrDash(biPassaporte.getText()));
-            submission.put("Residencia (Pais)", valueOrDash(residenciaPais.getText()));
-            submission.put("Provincia", valueOrDash(provincia.getText()));
-            submission.put("E-mail", valueOrDash(email.getText()));
-            submission.put("Contacto Telefonico", valueOrDash(telefone.getText()));
-            submission.put("Nivel de Escolaridade", valueOrDash(escolaridade.getValue()));
-            submission.put("Area de Estudo", joinSelected(areaTech, areaEco, areaSaude, areaArtes, areaMkt, areaJuridica, areaTurismo, areaAgricultura, areaSecretariado, areaOutra));
-            submission.put("Outra Area de Estudo", areaOutra.isSelected() ? valueOrDash(areaOutraText.getText()) : "-");
-            submission.put("Curso / Curso Tecnico", valueOrDash(curso.getText()));
-            submission.put("Instituicao", valueOrDash(instituicao.getText()));
-            submission.put("Pais da Formacao", valueOrDash(paisFormacao.getText()));
-            submission.put("Data de Fim de Curso", formatDate(dataFimCurso.getValue()));
-            submission.put("Areas de Interesse", joinSelected(areaBanca, areaLogistica, areaAdministrativa, areaDireito, areaContabilidade, areaTecnologias, areaMarketing, areaAuditoria, areaProjectos, areaRH, areaCompliance, areaInteresseOutro));
-            submission.put("Outra Area de Interesse", areaInteresseOutro.isSelected() ? valueOrDash(areaInteresseOutroText.getText()) : "-");
-            submission.put("Objectivos Profissionais", valueOrDash(objectivos.getText()));
-            submission.put("Resumo Profissional / Curriculum Vitae", valueOrDash(resumo.getText()));
-            submission.put("Consentimento de Dados", consentimento.isSelected() ? "Sim" : "Nao");
-            submission.put("Assinatura do Candidato", valueOrDash(assinatura.getText()));
-            submission.put("Data de Assinatura", formatDate(dataAssinatura.getValue()));
+            Candidatura candidatura = new Candidatura();
+            candidatura.setNomeCompleto(normalize(nomeCompleto.getText()));
+            candidatura.setDataNascimento(readDateInput(dataNascimento));
+            candidatura.setSexo(selectedToggleText(sexoGroup));
+            candidatura.setNacionalidade(normalize(nacionalidade.getText()));
+            candidatura.setBiPassaporte(normalize(biPassaporte.getText()));
+            candidatura.setResidenciaPais(normalize(residenciaPais.getText()));
+            candidatura.setProvincia(normalize(provincia.getText()));
+            candidatura.setEmail(normalize(email.getText()));
+            candidatura.setContactoTelefonico(normalize(telefone.getText()));
+            candidatura.setNivelEscolaridade(normalize(escolaridade.getValue()));
+            candidatura.setAreaEstudo(joinSelected(areaTech, areaEco, areaSaude, areaArtes, areaMkt, areaJuridica, areaTurismo, areaAgricultura, areaSecretariado, areaOutra));
+            candidatura.setOutraAreaEstudo(normalize(areaOutraText.getText()));
+            candidatura.setOutraAreaEstudoSelecionada(areaOutra.isSelected());
+            candidatura.setCursoTecnico(normalize(curso.getText()));
+            candidatura.setInstituicao(normalize(instituicao.getText()));
+            candidatura.setPaisFormacao(normalize(paisFormacao.getText()));
+            candidatura.setDataFimCurso(readDateInput(dataFimCurso));
+            candidatura.setAreasInteresse(joinSelected(areaBanca, areaLogistica, areaAdministrativa, areaDireito, areaContabilidade, areaTecnologias, areaMarketing, areaAuditoria, areaProjectos, areaRH, areaCompliance, areaInteresseOutro));
+            candidatura.setOutraAreaInteresse(normalize(areaInteresseOutroText.getText()));
+            candidatura.setOutraAreaInteresseSelecionada(areaInteresseOutro.isSelected());
+            candidatura.setObjectivosProfissionais(normalize(objectivos.getText()));
+            candidatura.setResumoProfissional(normalize(resumo.getText()));
+            candidatura.setConsentimentoAceite(consentimento.isSelected());
+            candidatura.setAssinaturaCandidato(normalize(assinatura.getText()));
+            candidatura.setDataAssinatura(readDateInput(dataAssinatura));
 
             try {
-                SubmissionStorage storage = saveSubmission(submission, nomeCompleto.getText());
+                SubmissionStorage storage = candidaturaService.submeter(candidatura);
                 limpar.fire();
+                final StackPane[] thankYouHolder = new StackPane[1];
                 StackPane thankYouView = createThankYouView(
-                    nomeCompleto.getText(),
+                    candidatura.getNomeCompleto(),
                     storage,
                     () -> {
                         stage.getScene().setRoot(rootHolder[0]);
                         stage.setTitle("Banco ATLANTICO | Formulario de Candidatura");
-                    }
+                    },
+                    () -> openConsultationScreen(
+                        stage,
+                        String.valueOf(storage.getRecordNumber()),
+                        () -> {
+                            stage.getScene().setRoot(thankYouHolder[0]);
+                            stage.setTitle("Banco ATLANTICO | Obrigado pela Candidatura");
+                        }
+                    )
                 );
+                thankYouHolder[0] = thankYouView;
                 stage.getScene().setRoot(thankYouView);
                 stage.setTitle("Banco ATLANTICO | Obrigado pela Candidatura");
+            } catch (ValidationException validationException) {
+                showAlert(Alert.AlertType.WARNING, "Campo obrigatorio", validationException.getMessage());
             } catch (IOException exception) {
                 showAlert(
                     Alert.AlertType.ERROR,
                     "Falha ao gravar",
-                    "Nao foi possivel guardar a candidatura em ficheiro.\nDetalhe: " + exception.getMessage()
+                    "Nao foi possivel guardar a candidatura em ficheiro de acesso aleatorio.\nDetalhe: " + exception.getMessage()
                 );
             }
         });
@@ -401,13 +371,13 @@ public class App extends Application {
             areaInteresseOutro.setSelected(false);
         });
 
-        Label saveHint = new Label("As inscricoes submetidas sao guardadas automaticamente na pasta inscricoes.");
+        Label saveHint = new Label("Persistencia em ficheiro de acesso aleatorio com registos fixos para leitura direta por numero.");
         saveHint.getStyleClass().add("save-hint");
 
         Region actionSpacer = new Region();
         HBox.setHgrow(actionSpacer, Priority.ALWAYS);
 
-        HBox actions = new HBox(12, saveHint, actionSpacer, limpar, enviar);
+        HBox actions = new HBox(12, saveHint, actionSpacer, consultarRegisto, limpar, enviar);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.getStyleClass().add("action-bar");
 
@@ -483,7 +453,73 @@ public class App extends Application {
         picker.setPromptText(prompt);
         picker.getStyleClass().add("input-field");
         picker.setMaxWidth(Double.MAX_VALUE);
+        picker.setConverter(createDateConverter());
+        picker.getEditor().setTextFormatter(new TextFormatter<String>(createDateFilter()));
         return picker;
+    }
+
+    private void applyLettersFilter(TextField field, boolean allowDots) {
+        String pattern = allowDots ? "[\\p{L} .'-]*" : "[\\p{L} '-]*";
+        field.setTextFormatter(new TextFormatter<String>(createPatternFilter(pattern, 60)));
+    }
+
+    private void applyDocumentFilter(TextField field) {
+        field.setTextFormatter(new TextFormatter<String>(createPatternFilter("[A-Za-z0-9/-]*", 20)));
+    }
+
+    private void applyEmailFilter(TextField field) {
+        field.setTextFormatter(new TextFormatter<String>(change -> {
+            String newText = change.getControlNewText();
+            if (newText.length() > 80) {
+                return null;
+            }
+            return newText.matches("[A-Za-z0-9@._+\\-]*") ? change : null;
+        }));
+    }
+
+    private void applyPhoneFilter(TextField field) {
+        field.setTextFormatter(new TextFormatter<String>(createPatternFilter("\\d*", 9)));
+    }
+
+    private UnaryOperator<TextFormatter.Change> createPatternFilter(String pattern, int maxLength) {
+        return change -> {
+            String newText = change.getControlNewText();
+            if (newText.length() > maxLength) {
+                return null;
+            }
+            return newText.matches(pattern) ? change : null;
+        };
+    }
+
+    private UnaryOperator<TextFormatter.Change> createDateFilter() {
+        return change -> {
+            String newText = change.getControlNewText();
+            if (newText.length() > 10) {
+                return null;
+            }
+            return newText.matches("[0-9/]*") ? change : null;
+        };
+    }
+
+    private StringConverter<LocalDate> createDateConverter() {
+        return new StringConverter<LocalDate>() {
+            @Override
+            public String toString(LocalDate date) {
+                return date == null ? "" : DISPLAY_DATE.format(date);
+            }
+
+            @Override
+            public LocalDate fromString(String value) {
+                if (value == null || value.trim().isEmpty()) {
+                    return null;
+                }
+                try {
+                    return LocalDate.parse(value.trim(), DISPLAY_DATE);
+                } catch (DateTimeParseException exception) {
+                    return null;
+                }
+            }
+        };
     }
 
     private HBox sexBox(RadioButton masculino, RadioButton feminino) {
@@ -520,7 +556,7 @@ public class App extends Application {
         field.setOpacity(1);
     }
 
-    private StackPane createThankYouView(String candidateName, SubmissionStorage storage, Runnable onBack) {
+    private StackPane createThankYouView(String candidateName, SubmissionStorage storage, Runnable onBack, Runnable onOpenConsultation) {
         Label badge = new Label("Candidatura Recebida");
         badge.getStyleClass().add("thank-you-badge");
 
@@ -528,14 +564,16 @@ public class App extends Application {
         title.getStyleClass().add("thank-you-title");
         title.setWrapText(true);
 
-        Label message = new Label("A candidatura de " + valueOrDash(candidateName) + " foi registada com sucesso. Os dados foram guardados em ficheiro e a equipa de recrutamento pode agora analisar o seu perfil.");
+        Label message = new Label("A candidatura de " + valueOrDash(candidateName) + " foi registada com sucesso. A camada de persistencia guardou o registo em RandomAccessFile e o numero abaixo pode ser usado para acesso direto ao conteudo.");
         message.getStyleClass().add("thank-you-message");
         message.setWrapText(true);
 
         Label fileInfo = new Label(
-            "Ficheiro RandomAccessFile: " + storage.filePath().toAbsolutePath()
+            "Ficheiro RandomAccessFile: " + storage.getFilePath().toAbsolutePath()
                 + System.lineSeparator()
-                + "Registo: #" + storage.recordNumber()
+                + "Registo: #" + storage.getRecordNumber()
+                + System.lineSeparator()
+                + "Tamanho do registo: " + candidaturaService.getRecordSize() + " bytes"
         );
         fileInfo.getStyleClass().add("thank-you-file");
         fileInfo.setWrapText(true);
@@ -544,12 +582,89 @@ public class App extends Application {
         backButton.getStyleClass().add("primary-btn");
         backButton.setOnAction(evt -> onBack.run());
 
-        VBox card = new VBox(16, badge, title, message, fileInfo, backButton);
+        Button consultButton = new Button("Consultar este registo agora");
+        consultButton.getStyleClass().add("secondary-btn");
+        consultButton.setOnAction(evt -> onOpenConsultation.run());
+
+        HBox actionRow = new HBox(12, backButton, consultButton);
+        actionRow.getStyleClass().add("screen-action-row");
+
+        VBox card = new VBox(16, badge, title, message, fileInfo, actionRow);
         card.getStyleClass().add("thank-you-card");
-        card.setMaxWidth(680);
+        card.setMaxWidth(720);
 
         StackPane wrapper = new StackPane(card);
         wrapper.getStyleClass().add("thank-you-screen");
+        wrapper.setPadding(new Insets(36));
+        return wrapper;
+    }
+
+    private void openConsultationScreen(Stage stage, String initialRecordNumber, Runnable onBack) {
+        StackPane consultationView = createConsultationView(initialRecordNumber, onBack);
+        stage.getScene().setRoot(consultationView);
+        stage.setTitle("Banco ATLANTICO | Consulta de Registos");
+    }
+
+    private StackPane createConsultationView(String initialRecordNumber, Runnable onBack) {
+        Label badge = new Label("Consulta RandomAccessFile");
+        badge.getStyleClass().add("thank-you-badge");
+
+        Label title = new Label("Consultar candidatura por numero de registo");
+        title.getStyleClass().add("consult-title");
+        title.setWrapText(true);
+
+        Label description = new Label("Esta tela demonstra o acesso aleatorio: introduza um numero de registo, a aplicacao calcula o offset e le apenas aquele bloco no ficheiro candidaturas.dat.");
+        description.getStyleClass().add("consult-help");
+        description.setWrapText(true);
+
+        Label formula = new Label("Formula usada: offset = (numero do registo - 1) x " + candidaturaService.getRecordSize() + " bytes");
+        formula.getStyleClass().add("consult-formula");
+        formula.setWrapText(true);
+
+        TextField recordField = createTextField("Numero do registo");
+        recordField.setText(initialRecordNumber == null ? "" : initialRecordNumber);
+
+        TextArea resultArea = new TextArea();
+        resultArea.setEditable(false);
+        resultArea.setWrapText(true);
+        resultArea.setPrefRowCount(18);
+        resultArea.setPromptText("O conteudo do registo aparecera aqui.");
+        resultArea.getStyleClass().addAll("input-area", "consult-output");
+
+        Button consultarButton = new Button("Ler Registo");
+        consultarButton.getStyleClass().add("primary-btn");
+        consultarButton.setOnAction(evt -> {
+            String rawValue = normalize(recordField.getText());
+            if (rawValue.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Numero obrigatorio", "Informe o numero do registo que pretende consultar.");
+                return;
+            }
+
+            try {
+                long recordNumber = Long.parseLong(rawValue);
+                String result = candidaturaService.consultarResumoPorRegisto(recordNumber);
+                resultArea.setText(result);
+            } catch (NumberFormatException exception) {
+                showAlert(Alert.AlertType.WARNING, "Numero invalido", "Introduza um numero inteiro positivo para consultar o registo.");
+            } catch (IOException exception) {
+                showAlert(Alert.AlertType.ERROR, "Falha na consulta", exception.getMessage());
+            }
+        });
+
+        Button backButton = new Button("Voltar");
+        backButton.getStyleClass().add("secondary-btn");
+        backButton.setOnAction(evt -> onBack.run());
+
+        HBox actionRow = new HBox(12, backButton, consultarButton);
+        actionRow.getStyleClass().add("screen-action-row");
+
+        VBox card = new VBox(16, badge, title, description, formula, recordField, actionRow, resultArea);
+        card.getStyleClass().add("consult-card");
+        card.setMaxWidth(820);
+        VBox.setVgrow(resultArea, Priority.ALWAYS);
+
+        StackPane wrapper = new StackPane(card);
+        wrapper.getStyleClass().add("consult-screen");
         wrapper.setPadding(new Insets(36));
         return wrapper;
     }
@@ -569,60 +684,12 @@ public class App extends Application {
         return hero;
     }
 
-    private SubmissionStorage saveSubmission(Map<String, String> submission, String candidateName) throws IOException {
-        Path directory = Paths.get(System.getProperty("user.dir"), "inscricoes");
-        Files.createDirectories(directory);
-
-        Path targetFile = directory.resolve("candidaturas.dat");
-
-        StringBuilder content = new StringBuilder();
-        content.append("BANCO ATLANTICO - CANDIDATURA PROFISSIONAL").append(System.lineSeparator());
-        content.append("Candidato: ").append(valueOrDash(candidateName)).append(System.lineSeparator());
-        content.append("Gerado em: ").append(FILE_TIMESTAMP.format(LocalDateTime.now())).append(System.lineSeparator());
-        content.append(System.lineSeparator());
-
-        for (Map.Entry<String, String> entry : submission.entrySet()) {
-            content.append(entry.getKey())
-                .append(": ")
-                .append(entry.getValue())
-                .append(System.lineSeparator());
-        }
-
-        byte[] payload = content.toString().getBytes(StandardCharsets.UTF_8);
-        if (payload.length > RECORD_PAYLOAD_SIZE) {
-            throw new IOException("A candidatura excede o tamanho maximo de registo para RandomAccessFile.");
-        }
-
-        try (RandomAccessFile file = new RandomAccessFile(targetFile.toFile(), "rw")) {
-            long recordNumber = (file.length() / RECORD_SIZE) + 1;
-            file.seek(file.length());
-            file.writeBoolean(true);
-            file.writeInt(payload.length);
-            file.write(payload);
-
-            int padding = RECORD_PAYLOAD_SIZE - payload.length;
-            if (padding > 0) {
-                file.write(new byte[padding]);
-            }
-
-            return new SubmissionStorage(targetFile, recordNumber);
-        }
-    }
-
     private String selectedToggleText(ToggleGroup group) {
-        if (group.getSelectedToggle() instanceof RadioButton radioButton) {
-            return radioButton.getText();
+        Toggle selectedToggle = group.getSelectedToggle();
+        if (selectedToggle instanceof RadioButton) {
+            return ((RadioButton) selectedToggle).getText();
         }
-        return "-";
-    }
-
-    private boolean hasAnySelected(CheckBox... checkBoxes) {
-        for (CheckBox checkBox : checkBoxes) {
-            if (checkBox.isSelected()) {
-                return true;
-            }
-        }
-        return false;
+        return "";
     }
 
     private String joinSelected(CheckBox... checkBoxes) {
@@ -632,33 +699,24 @@ public class App extends Application {
                 joiner.add(checkBox.getText());
             }
         }
-        return joiner.length() == 0 ? "-" : joiner.toString();
+        return joiner.toString();
     }
 
     private String formatDate(LocalDate date) {
-        return date == null ? "-" : DISPLAY_DATE.format(date);
+        return date == null ? "" : DISPLAY_DATE.format(date);
+    }
+
+    private String readDateInput(DatePicker picker) {
+        String editorText = normalize(picker.getEditor().getText());
+        return editorText.isEmpty() ? formatDate(picker.getValue()) : editorText;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String valueOrDash(String value) {
-        return value == null || value.isBlank() ? "-" : value.trim();
-    }
-
-    private Map.Entry<String, String> field(String label, String value) {
-        return Map.entry(label, value == null ? "" : value.trim());
-    }
-
-    @SafeVarargs
-    private String firstBlankField(Map.Entry<String, String>... fields) {
-        for (Map.Entry<String, String> field : fields) {
-            if (field.getValue().isBlank()) {
-                return field.getKey();
-            }
-        }
-        return null;
-    }
-
-    private void showRequiredFieldAlert(String fieldName) {
-        showAlert(Alert.AlertType.WARNING, "Campo obrigatorio", "Preencha o campo obrigatorio: " + fieldName + ".");
+        return value == null || value.trim().isEmpty() ? "-" : value.trim();
     }
 
     private void showAlert(Alert.AlertType type, String title, String msg) {

@@ -1,2 +1,7 @@
 /home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/App.java
+/home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/model/Candidatura.java
+/home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/persistence/RandomAccessCandidaturaRepository.java
+/home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/persistence/SubmissionStorage.java
+/home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/service/CandidaturaService.java
+/home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/com/mycompany/teste/service/ValidationException.java
 /home/heliossandro-afonso/Documentos/netbeansProject/teste/src/main/java/module-info.java

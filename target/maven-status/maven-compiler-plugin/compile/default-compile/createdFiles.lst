@@ -1,2 +1,7 @@
 module-info.class
 com/mycompany/teste/App.class
+com/mycompany/teste/service/CandidaturaService.class
+com/mycompany/teste/persistence/SubmissionStorage.class
+com/mycompany/teste/service/ValidationException.class
+com/mycompany/teste/model/Candidatura.class
+com/mycompany/teste/persistence/RandomAccessCandidaturaRepository.class
