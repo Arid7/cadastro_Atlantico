@@ -5,10 +5,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import com.mycompany.teste.model.Candidatura;
 import com.mycompany.teste.persistence.RandomAccessCandidaturaRepository;
+import com.mycompany.teste.persistence.RecordEntry;
 import com.mycompany.teste.persistence.SubmissionStorage;
 
 public class CandidaturaService {
@@ -35,6 +37,18 @@ public class CandidaturaService {
         return repository.readRecord(recordNumber);
     }
 
+    public String listarTodasAsCandidaturas() throws IOException {
+        return formatEntries(repository.listAllRecords(), "Ainda nao existem candidaturas gravadas.");
+    }
+
+    public String pesquisarCandidaturasPorNome(String candidateName) throws IOException, ValidationException {
+        require("Nome do candidato", candidateName);
+        return formatEntries(
+            repository.searchByCandidateName(candidateName),
+            "Nenhuma candidatura encontrada para o nome informado."
+        );
+    }
+
     public int getRecordSize() {
         return repository.getRecordSize();
     }
@@ -45,7 +59,7 @@ public class CandidaturaService {
         require("Sexo", candidatura.getSexo());
         require("Nacionalidade", candidatura.getNacionalidade());
         require("B.I. / Passaporte", candidatura.getBiPassaporte());
-        require("Residencia (Pais)", candidatura.getResidenciaPais());
+        require("Pais de Residencia", candidatura.getResidenciaPais());
         require("Provincia", candidatura.getProvincia());
         require("E-mail", candidatura.getEmail());
         require("Contacto Telefonico", candidatura.getContactoTelefonico());
@@ -57,7 +71,6 @@ public class CandidaturaService {
         require("Curso / Curso Tecnico", candidatura.getCursoTecnico());
         require("Instituicao", candidatura.getInstituicao());
         require("Pais da Formacao", candidatura.getPaisFormacao());
-        require("Data de Fim de Curso", candidatura.getDataFimCurso());
         require("Areas de Interesse", candidatura.getAreasInteresse());
         if (candidatura.isOutraAreaInteresseSelecionada()) {
             require("Especifique outra area de interesse", candidatura.getOutraAreaInteresse());
@@ -70,7 +83,7 @@ public class CandidaturaService {
         validatePersonName("Nome Completo", candidatura.getNomeCompleto());
         validatePersonName("Assinatura do Candidato", candidatura.getAssinaturaCandidato());
         validatePlaceName("Nacionalidade", candidatura.getNacionalidade());
-        validatePlaceName("Residencia (Pais)", candidatura.getResidenciaPais());
+        validatePlaceName("Pais de Residencia", candidatura.getResidenciaPais());
         validatePlaceName("Provincia", candidatura.getProvincia());
         validatePlaceName("Pais da Formacao", candidatura.getPaisFormacao());
         validateDocument(candidatura.getBiPassaporte());
@@ -78,11 +91,13 @@ public class CandidaturaService {
         validatePhone(candidatura.getContactoTelefonico());
 
         LocalDate dataNascimento = validatePastOrPresentDate("Data de Nascimento", candidatura.getDataNascimento());
-        LocalDate dataFimCurso = validatePastOrPresentDate("Data de Fim de Curso", candidatura.getDataFimCurso());
         LocalDate dataAssinatura = validatePastOrPresentDate("Data de Assinatura", candidatura.getDataAssinatura());
 
-        if (dataFimCurso.isBefore(dataNascimento)) {
-            throw new ValidationException("Data de Fim de Curso", "A data de fim de curso nao pode ser anterior a data de nascimento.");
+        if (containsText(candidatura.getDataFimCurso())) {
+            LocalDate dataFimCurso = validatePastOrPresentDate("Data de Conclusao do Curso", candidatura.getDataFimCurso());
+            if (dataFimCurso.isBefore(dataNascimento)) {
+                throw new ValidationException("Data de Conclusao do Curso", "A data de conclusao do curso nao pode ser anterior a data de nascimento.");
+            }
         }
 
         if (dataAssinatura.isBefore(dataNascimento)) {
@@ -140,5 +155,35 @@ public class CandidaturaService {
         } catch (DateTimeParseException exception) {
             throw new ValidationException(fieldName, "A data informada em " + fieldName + " deve estar no formato dd/MM/yyyy.");
         }
+    }
+
+    private boolean containsText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String formatEntries(List<RecordEntry> entries, String emptyMessage) {
+        if (entries.isEmpty()) {
+            return emptyMessage;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < entries.size(); index++) {
+            RecordEntry entry = entries.get(index);
+            builder.append("REGISTO #")
+                .append(entry.getRecordNumber())
+                .append(" - ")
+                .append(entry.getCandidateName())
+                .append(System.lineSeparator())
+                .append(entry.getContent());
+
+            if (index < entries.size() - 1) {
+                builder.append(System.lineSeparator())
+                    .append(System.lineSeparator())
+                    .append("------------------------------------------------------------")
+                    .append(System.lineSeparator())
+                    .append(System.lineSeparator());
+            }
+        }
+        return builder.toString();
     }
 }

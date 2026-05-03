@@ -8,6 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import com.mycompany.teste.model.Candidatura;
@@ -82,12 +86,69 @@ public class RandomAccessCandidaturaRepository {
         }
     }
 
+    public List<RecordEntry> listAllRecords() throws IOException {
+        return readMatchingRecords(null);
+    }
+
+    public List<RecordEntry> searchByCandidateName(String candidateName) throws IOException {
+        return readMatchingRecords(candidateName);
+    }
+
     public Path getDataFile() {
         return dataFile;
     }
 
     public int getRecordSize() {
         return RECORD_SIZE;
+    }
+
+    private List<RecordEntry> readMatchingRecords(String candidateNameFilter) throws IOException {
+        if (!Files.exists(dataFile)) {
+            return Collections.emptyList();
+        }
+
+        List<RecordEntry> matches = new ArrayList<RecordEntry>();
+        String normalizedFilter = candidateNameFilter == null ? null : candidateNameFilter.trim().toLowerCase(Locale.ROOT);
+
+        RandomAccessFile file = new RandomAccessFile(dataFile.toFile(), "r");
+        try {
+            long totalRecords = file.length() / RECORD_SIZE;
+            for (long index = 0; index < totalRecords; index++) {
+                long offset = index * RECORD_SIZE;
+                file.seek(offset);
+
+                boolean active = file.readBoolean();
+                int payloadLength = file.readInt();
+                if (payloadLength < 0 || payloadLength > RECORD_PAYLOAD_SIZE) {
+                    throw new IOException("Foi encontrado um registo corrompido no ficheiro de candidaturas.");
+                }
+
+                byte[] payload = new byte[RECORD_PAYLOAD_SIZE];
+                file.readFully(payload);
+                if (!active) {
+                    continue;
+                }
+
+                String content = new String(payload, 0, payloadLength, STORAGE_CHARSET);
+                String candidateName = extractCandidateName(content);
+                if (normalizedFilter == null || candidateName.toLowerCase(Locale.ROOT).contains(normalizedFilter)) {
+                    matches.add(new RecordEntry(index + 1, candidateName, content));
+                }
+            }
+            return matches;
+        } finally {
+            file.close();
+        }
+    }
+
+    private String extractCandidateName(String content) {
+        String[] lines = content.split("\\R");
+        for (String line : lines) {
+            if (line.startsWith("Candidato: ")) {
+                return line.substring("Candidato: ".length()).trim();
+            }
+        }
+        return "Nao identificado";
     }
 
     private String serialize(Candidatura candidatura) {

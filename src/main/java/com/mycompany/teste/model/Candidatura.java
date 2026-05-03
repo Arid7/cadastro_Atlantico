@@ -238,7 +238,7 @@ public class Candidatura {
         values.put("Sexo", persistedValue(sexo));
         values.put("Nacionalidade", persistedValue(nacionalidade));
         values.put("B.I. / Passaporte", persistedValue(biPassaporte));
-        values.put("Residencia (Pais)", persistedValue(residenciaPais));
+        values.put("Pais de Residencia", persistedValue(residenciaPais));
         values.put("Provincia", persistedValue(provincia));
         values.put("E-mail", persistedValue(email));
         values.put("Contacto Telefonico", persistedValue(contactoTelefonico));
@@ -248,7 +248,7 @@ public class Candidatura {
         values.put("Curso / Curso Tecnico", persistedValue(cursoTecnico));
         values.put("Instituicao", persistedValue(instituicao));
         values.put("Pais da Formacao", persistedValue(paisFormacao));
-        values.put("Data de Fim de Curso", persistedValue(dataFimCurso));
+        values.put("Data de Conclusao do Curso", persistedValue(dataFimCurso));
         values.put("Areas de Interesse", persistedValue(areasInteresse));
         values.put("Outra Area de Interesse", outraAreaInteresseSelecionada ? persistedValue(outraAreaInteresse) : "-");
         values.put("Objectivos Profissionais", persistedValue(objectivosProfissionais));

@@ -131,12 +131,13 @@ Agora a aplicacao tem tambem uma tela de consulta por registo.
 O fluxo da consulta e este:
 
 1. o utilizador abre a tela `Consultar Registo`
-2. informa o numero do registo que pretende ler
-3. a GUI chama `candidaturaService.consultarResumoPorRegisto(numero)`
-4. a camada de negocio delega ao repositorio
-5. o repositorio calcula o offset desse registo
-6. o repositorio usa `seek(offset)` para ir diretamente ao bloco desejado
-7. o conteudo do registo e lido e mostrado no ecran
+2. pode escolher entre tres formas de consulta
+3. ler por numero do registo
+4. pesquisar por nome do candidato
+5. listar todos os registos gravados
+6. a camada de negocio delega ao repositorio
+7. o repositorio percorre os registos e devolve apenas o que foi pedido
+8. o conteudo encontrado e mostrado no ecran
 
 Esta tela existe para demonstrar, na pratica, que o ficheiro foi desenhado para acesso aleatorio e nao apenas para leitura sequencial.
 
@@ -255,6 +256,8 @@ Casos especiais:
 
 - se a opcao `Outra` for marcada em area de estudo, o texto explicativo tambem passa a ser obrigatorio
 - se a opcao `Outro` for marcada em area de interesse, o texto explicativo tambem passa a ser obrigatorio
+- a `Data de Conclusao do Curso` passou a ser opcional
+- se essa data for preenchida, continua a ser validada e nao pode ser futura nem anterior a data de nascimento
 
 ### 8.3 Exemplo pratico de validacao
 
@@ -299,8 +302,9 @@ Esta tela tem dois objetivos:
 Permite:
 
 - informar um numero de registo
-- calcular o offset correspondente
-- ler o registo direto do `RandomAccessFile`
+- pesquisar candidaturas por nome
+- listar todos os registos existentes
+- localizar o conteudo gravado no ficheiro
 - mostrar o conteudo no ecran
 
 Esta e a melhor parte da demo tecnica do projeto.

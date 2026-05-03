@@ -6,6 +6,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.function.UnaryOperator;
 
@@ -46,6 +50,28 @@ import javafx.util.StringConverter;
 public class App extends Application {
 
     private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
+    private static final List<String> NACIONALIDADES = Arrays.asList(
+        "Angolana",
+        "Brasileira",
+        "Cabo-verdiana",
+        "Guineense",
+        "Mocambicana",
+        "Namibiana",
+        "Portuguesa",
+        "Santomense",
+        "Sul-africana"
+    );
+    private static final List<String> PAISES = Arrays.asList(
+        "Angola",
+        "Brasil",
+        "Cabo Verde",
+        "Mocambique",
+        "Namibia",
+        "Portugal",
+        "Sao Tome e Principe",
+        "Africa do Sul"
+    );
+    private static final Map<String, List<String>> PROVINCIAS_POR_PAIS = createProvinceMap();
 
     private final CandidaturaService candidaturaService = new CandidaturaService(
         new RandomAccessCandidaturaRepository(Paths.get(System.getProperty("user.dir"), "inscricoes"))
@@ -75,14 +101,14 @@ public class App extends Application {
         Label subtitle = new Label("Banco ATLANTICO | Recrutamento e Talento");
         subtitle.getStyleClass().add("form-subtitle");
 
-        Label lead = new Label("Preencha o formulario com os seus dados academicos e profissionais. A validacao fica na camada de negocio, os registos sao guardados em RandomAccessFile e podem ser consultados diretamente pelo numero do registo.");
+        Label lead = new Label("Preencha o formulario com os seus dados academicos e profissionais e confirme cada secao antes de submeter.");
         lead.setWrapText(true);
         lead.getStyleClass().add("lead-copy");
 
         HBox highlights = new HBox(12,
             createInfoCard("Fluxo claro", "Secoes organizadas para preenchimento rapido."),
-            createInfoCard("Persistencia RAF", "Registos fixos em RandomAccessFile para acesso direto."),
-            createInfoCard("Negocio separado", "Validacao e submissao isoladas da camada JavaFX.")
+            createInfoCard("Dados consistentes", "Listas guiadas para reduzir erros de preenchimento."),
+            createInfoCard("Confirmacao imediata", "A candidatura e confirmada logo apos a submissao.")
         );
         highlights.getStyleClass().add("info-strip");
 
@@ -95,20 +121,19 @@ public class App extends Application {
         sexoMasculino.setToggleGroup(sexoGroup);
         sexoFeminino.setToggleGroup(sexoGroup);
 
-        TextField nacionalidade = createTextField("Nacionalidade");
+        ComboBox<String> nacionalidade = createComboBox("Nacionalidade", NACIONALIDADES);
         TextField biPassaporte = createTextField("B.I. / Passaporte");
-        TextField residenciaPais = createTextField("Residencia (Pais)");
-        TextField provincia = createTextField("Provincia");
+        ComboBox<String> residenciaPais = createComboBox("Pais de Residencia", PAISES);
+        ComboBox<String> provincia = createComboBox("Provincia", Arrays.asList());
         TextField email = createTextField("E-mail");
         TextField telefone = createTextField("Contacto Telefonico");
 
         applyLettersFilter(nomeCompleto, true);
-        applyLettersFilter(nacionalidade, false);
-        applyLettersFilter(residenciaPais, false);
-        applyLettersFilter(provincia, false);
         applyDocumentFilter(biPassaporte);
         applyEmailFilter(email);
         applyPhoneFilter(telefone);
+        provincia.setDisable(true);
+        residenciaPais.setOnAction(evt -> updateProvinceOptions(residenciaPais, provincia));
 
         GridPane dadosPessoais = createGrid();
         dadosPessoais.add(sectionHeader("1. DADOS PESSOAIS"), 0, 0, 4, 1);
@@ -155,10 +180,8 @@ public class App extends Application {
 
         TextField curso = createTextField("Curso / Curso Tecnico");
         TextField instituicao = createTextField("Instituicao");
-        TextField paisFormacao = createTextField("Pais");
-        DatePicker dataFimCurso = createDatePicker("Data de Fim de Curso");
-
-        applyLettersFilter(paisFormacao, false);
+        ComboBox<String> paisFormacao = createComboBox("Pais da Formacao", PAISES);
+        DatePicker dataFimCurso = createDatePicker("Data de Conclusao do Curso (Opcional)");
 
         GridPane habilitacoes = createGrid();
         habilitacoes.add(sectionHeader("2. HABILITACOES ACADEMICAS E AREA DE ESTUDO"), 0, 0, 4, 1);
@@ -266,10 +289,10 @@ public class App extends Application {
             candidatura.setNomeCompleto(normalize(nomeCompleto.getText()));
             candidatura.setDataNascimento(readDateInput(dataNascimento));
             candidatura.setSexo(selectedToggleText(sexoGroup));
-            candidatura.setNacionalidade(normalize(nacionalidade.getText()));
+            candidatura.setNacionalidade(normalize(nacionalidade.getValue()));
             candidatura.setBiPassaporte(normalize(biPassaporte.getText()));
-            candidatura.setResidenciaPais(normalize(residenciaPais.getText()));
-            candidatura.setProvincia(normalize(provincia.getText()));
+            candidatura.setResidenciaPais(normalize(residenciaPais.getValue()));
+            candidatura.setProvincia(normalize(provincia.getValue()));
             candidatura.setEmail(normalize(email.getText()));
             candidatura.setContactoTelefonico(normalize(telefone.getText()));
             candidatura.setNivelEscolaridade(normalize(escolaridade.getValue()));
@@ -278,7 +301,7 @@ public class App extends Application {
             candidatura.setOutraAreaEstudoSelecionada(areaOutra.isSelected());
             candidatura.setCursoTecnico(normalize(curso.getText()));
             candidatura.setInstituicao(normalize(instituicao.getText()));
-            candidatura.setPaisFormacao(normalize(paisFormacao.getText()));
+            candidatura.setPaisFormacao(normalize(paisFormacao.getValue()));
             candidatura.setDataFimCurso(readDateInput(dataFimCurso));
             candidatura.setAreasInteresse(joinSelected(areaBanca, areaLogistica, areaAdministrativa, areaDireito, areaContabilidade, areaTecnologias, areaMarketing, areaAuditoria, areaProjectos, areaRH, areaCompliance, areaInteresseOutro));
             candidatura.setOutraAreaInteresse(normalize(areaInteresseOutroText.getText()));
@@ -318,7 +341,7 @@ public class App extends Application {
                 showAlert(
                     Alert.AlertType.ERROR,
                     "Falha ao gravar",
-                    "Nao foi possivel guardar a candidatura em ficheiro de acesso aleatorio.\nDetalhe: " + exception.getMessage()
+                    "Nao foi possivel guardar a candidatura neste momento.\nDetalhe: " + exception.getMessage()
                 );
             }
         });
@@ -327,16 +350,18 @@ public class App extends Application {
             nomeCompleto.clear();
             dataNascimento.setValue(null);
             sexoGroup.selectToggle(null);
-            nacionalidade.clear();
+            nacionalidade.getSelectionModel().clearSelection();
             biPassaporte.clear();
-            residenciaPais.clear();
-            provincia.clear();
+            residenciaPais.getSelectionModel().clearSelection();
+            provincia.getSelectionModel().clearSelection();
+            provincia.getItems().clear();
+            provincia.setDisable(true);
             email.clear();
             telefone.clear();
             escolaridade.getSelectionModel().clearSelection();
             curso.clear();
             instituicao.clear();
-            paisFormacao.clear();
+            paisFormacao.getSelectionModel().clearSelection();
             dataFimCurso.setValue(null);
             objectivos.clear();
             resumo.clear();
@@ -371,7 +396,7 @@ public class App extends Application {
             areaInteresseOutro.setSelected(false);
         });
 
-        Label saveHint = new Label("Persistencia em ficheiro de acesso aleatorio com registos fixos para leitura direta por numero.");
+        Label saveHint = new Label("Revise os seus dados antes de confirmar a candidatura.");
         saveHint.getStyleClass().add("save-hint");
 
         Region actionSpacer = new Region();
@@ -446,6 +471,15 @@ public class App extends Application {
         field.getStyleClass().add("input-field");
         field.setMaxWidth(Double.MAX_VALUE);
         return field;
+    }
+
+    private ComboBox<String> createComboBox(String prompt, List<String> items) {
+        ComboBox<String> comboBox = new ComboBox<>();
+        comboBox.getItems().addAll(items);
+        comboBox.setPromptText(prompt);
+        comboBox.getStyleClass().add("input-field");
+        comboBox.setMaxWidth(Double.MAX_VALUE);
+        return comboBox;
     }
 
     private DatePicker createDatePicker(String prompt) {
@@ -556,6 +590,23 @@ public class App extends Application {
         field.setOpacity(1);
     }
 
+    private void updateProvinceOptions(ComboBox<String> paisComboBox, ComboBox<String> provinciaComboBox) {
+        String pais = paisComboBox.getValue();
+        provinciaComboBox.getItems().clear();
+        provinciaComboBox.getSelectionModel().clearSelection();
+
+        if (pais == null || pais.isEmpty()) {
+            provinciaComboBox.setDisable(true);
+            return;
+        }
+
+        List<String> provincias = PROVINCIAS_POR_PAIS.get(pais);
+        if (provincias != null) {
+            provinciaComboBox.getItems().addAll(provincias);
+        }
+        provinciaComboBox.setDisable(false);
+    }
+
     private StackPane createThankYouView(String candidateName, SubmissionStorage storage, Runnable onBack, Runnable onOpenConsultation) {
         Label badge = new Label("Candidatura Recebida");
         badge.getStyleClass().add("thank-you-badge");
@@ -564,16 +615,12 @@ public class App extends Application {
         title.getStyleClass().add("thank-you-title");
         title.setWrapText(true);
 
-        Label message = new Label("A candidatura de " + valueOrDash(candidateName) + " foi registada com sucesso. A camada de persistencia guardou o registo em RandomAccessFile e o numero abaixo pode ser usado para acesso direto ao conteudo.");
+        Label message = new Label("A candidatura de " + valueOrDash(candidateName) + " foi registada com sucesso. Guarde o numero abaixo para consultar este registo sempre que precisar.");
         message.getStyleClass().add("thank-you-message");
         message.setWrapText(true);
 
         Label fileInfo = new Label(
-            "Ficheiro RandomAccessFile: " + storage.getFilePath().toAbsolutePath()
-                + System.lineSeparator()
-                + "Registo: #" + storage.getRecordNumber()
-                + System.lineSeparator()
-                + "Tamanho do registo: " + candidaturaService.getRecordSize() + " bytes"
+            "Numero do registo: #" + storage.getRecordNumber()
         );
         fileInfo.getStyleClass().add("thank-you-file");
         fileInfo.setWrapText(true);
@@ -606,23 +653,22 @@ public class App extends Application {
     }
 
     private StackPane createConsultationView(String initialRecordNumber, Runnable onBack) {
-        Label badge = new Label("Consulta RandomAccessFile");
+        Label badge = new Label("Consulta de Candidatura");
         badge.getStyleClass().add("thank-you-badge");
 
         Label title = new Label("Consultar candidatura por numero de registo");
         title.getStyleClass().add("consult-title");
         title.setWrapText(true);
 
-        Label description = new Label("Esta tela demonstra o acesso aleatorio: introduza um numero de registo, a aplicacao calcula o offset e le apenas aquele bloco no ficheiro candidaturas.dat.");
+        Label description = new Label("Pode consultar um registo especifico, pesquisar candidaturas por nome ou listar todos os registos guardados.");
         description.getStyleClass().add("consult-help");
         description.setWrapText(true);
 
-        Label formula = new Label("Formula usada: offset = (numero do registo - 1) x " + candidaturaService.getRecordSize() + " bytes");
-        formula.getStyleClass().add("consult-formula");
-        formula.setWrapText(true);
-
         TextField recordField = createTextField("Numero do registo");
         recordField.setText(initialRecordNumber == null ? "" : initialRecordNumber);
+
+        TextField nameField = createTextField("Nome do candidato");
+        applyLettersFilter(nameField, true);
 
         TextArea resultArea = new TextArea();
         resultArea.setEditable(false);
@@ -651,14 +697,37 @@ public class App extends Application {
             }
         });
 
+        Button searchButton = new Button("Pesquisar por Nome");
+        searchButton.getStyleClass().add("secondary-btn");
+        searchButton.setOnAction(evt -> {
+            try {
+                String result = candidaturaService.pesquisarCandidaturasPorNome(normalize(nameField.getText()));
+                resultArea.setText(result);
+            } catch (ValidationException exception) {
+                showAlert(Alert.AlertType.WARNING, "Nome obrigatorio", exception.getMessage());
+            } catch (IOException exception) {
+                showAlert(Alert.AlertType.ERROR, "Falha na pesquisa", exception.getMessage());
+            }
+        });
+
+        Button listButton = new Button("Listar Todos");
+        listButton.getStyleClass().add("secondary-btn");
+        listButton.setOnAction(evt -> {
+            try {
+                resultArea.setText(candidaturaService.listarTodasAsCandidaturas());
+            } catch (IOException exception) {
+                showAlert(Alert.AlertType.ERROR, "Falha na listagem", exception.getMessage());
+            }
+        });
+
         Button backButton = new Button("Voltar");
         backButton.getStyleClass().add("secondary-btn");
         backButton.setOnAction(evt -> onBack.run());
 
-        HBox actionRow = new HBox(12, backButton, consultarButton);
+        HBox actionRow = new HBox(12, backButton, consultarButton, searchButton, listButton);
         actionRow.getStyleClass().add("screen-action-row");
 
-        VBox card = new VBox(16, badge, title, description, formula, recordField, actionRow, resultArea);
+        VBox card = new VBox(16, badge, title, description, recordField, nameField, actionRow, resultArea);
         card.getStyleClass().add("consult-card");
         card.setMaxWidth(820);
         VBox.setVgrow(resultArea, Priority.ALWAYS);
@@ -717,6 +786,47 @@ public class App extends Application {
 
     private String valueOrDash(String value) {
         return value == null || value.trim().isEmpty() ? "-" : value.trim();
+    }
+
+    private static Map<String, List<String>> createProvinceMap() {
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        values.put("Angola", Arrays.asList(
+            "Bengo", "Benguela", "Bie", "Cabinda", "Cuando Cubango", "Cuanza Norte",
+            "Cuanza Sul", "Cunene", "Huambo", "Huila", "Luanda", "Lunda Norte",
+            "Lunda Sul", "Malanje", "Moxico", "Namibe", "Uige", "Zaire"
+        ));
+        values.put("Brasil", Arrays.asList(
+            "Acre", "Alagoas", "Amapa", "Amazonas", "Bahia", "Ceara", "Distrito Federal",
+            "Espirito Santo", "Goias", "Maranhao", "Mato Grosso", "Mato Grosso do Sul",
+            "Minas Gerais", "Para", "Paraiba", "Parana", "Pernambuco", "Piaui",
+            "Rio de Janeiro", "Rio Grande do Norte", "Rio Grande do Sul", "Rondonia",
+            "Roraima", "Santa Catarina", "Sao Paulo", "Sergipe", "Tocantins"
+        ));
+        values.put("Cabo Verde", Arrays.asList(
+            "Boa Vista", "Brava", "Maio", "Mosteiros", "Paul", "Porto Novo", "Praia",
+            "Ribeira Brava", "Ribeira Grande", "Sal", "Santa Catarina", "Santa Cruz", "Sao Filipe", "Sao Vicente", "Tarrafal"
+        ));
+        values.put("Mocambique", Arrays.asList(
+            "Cabo Delgado", "Gaza", "Inhambane", "Manica", "Maputo", "Maputo Cidade",
+            "Nampula", "Niassa", "Sofala", "Tete", "Zambezia"
+        ));
+        values.put("Namibia", Arrays.asList(
+            "Erongo", "Hardap", "Karas", "Kavango East", "Kavango West", "Khomas", "Kunene",
+            "Ohangwena", "Omaheke", "Omusati", "Oshana", "Oshikoto", "Otjozondjupa", "Zambezi"
+        ));
+        values.put("Portugal", Arrays.asList(
+            "Aveiro", "Beja", "Braga", "Braganca", "Castelo Branco", "Coimbra", "Evora",
+            "Faro", "Guarda", "Leiria", "Lisboa", "Madeira", "Portalegre", "Porto",
+            "Santarem", "Setubal", "Viana do Castelo", "Vila Real", "Viseu", "Acores"
+        ));
+        values.put("Sao Tome e Principe", Arrays.asList(
+            "Agua Grande", "Cantagalo", "Caue", "Lemba", "Lobata", "Me-Zochi", "Pague"
+        ));
+        values.put("Africa do Sul", Arrays.asList(
+            "Eastern Cape", "Free State", "Gauteng", "KwaZulu-Natal", "Limpopo",
+            "Mpumalanga", "Northern Cape", "North West", "Western Cape"
+        ));
+        return values;
     }
 
     private void showAlert(Alert.AlertType type, String title, String msg) {

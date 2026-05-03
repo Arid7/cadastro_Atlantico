@@ -1,5 +1,6 @@
 module-info.class
 com/mycompany/teste/App.class
+com/mycompany/teste/App$1.class
 com/mycompany/teste/service/CandidaturaService.class
 com/mycompany/teste/persistence/SubmissionStorage.class
 com/mycompany/teste/service/ValidationException.class
